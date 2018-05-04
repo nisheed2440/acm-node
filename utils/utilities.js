@@ -17,6 +17,9 @@ function createScript(dom, src, id, defer){
     if(id) {
         scriptTag.id = id;
     }
+    if(defer) {
+        scriptTag.setAttribute('async', true);
+    }
     return scriptTag;
 }
 

@@ -11,6 +11,7 @@ const React = require('react');
 const ReactDOMServer = require('react-dom/server');
 const { JSDOM } = jsdom;
 const {commonScripts, createScript} = require('./utilities');
+const _ = require('lodash');
 
 function createInlineScriptDataObject(dom, data, varName) {
     const scriptEl = dom.window.document.createElement('script');
@@ -28,8 +29,8 @@ async function componentResolver(inputTemplate) {
     let componentStylesPromises = [];
     let scriptsDataObject = {};
     let scriptsURLObject = {};
-    let outputScriptString = '';
-    let outputStylesString = '';
+    // let outputScriptString = '';
+    // let outputStylesString = '';
 
     dom.window.document.body.querySelectorAll('[data-component]').forEach((el) => {
         const componentType = el.getAttribute('data-component');
@@ -39,10 +40,10 @@ async function componentResolver(inputTemplate) {
         el.removeAttribute('data-json');
         componentScriptPromises.push(rp(`http://localhost:9000/javascripts/${componentType}Component.js`)
             .then((body) => {
-                return {body, componentId};
+                return {body, componentId, componentType};
             })
             .catch((err) => {
-                return {err, componentId};
+                return {err, componentId, componentType};
             }));
     });
 
@@ -56,7 +57,10 @@ async function componentResolver(inputTemplate) {
             
             const componentReact = requireFromString(componentScript.body);
             const componentId = componentScript.componentId;
-            outputScriptString += `${componentScript.body};`;
+            const componentType = componentScript.componentType;
+            if(!scriptsURLObject[componentType]){
+                scriptsURLObject[componentType] = `http://localhost:9000/javascripts/${componentType}Component.js`;
+            }
             
             if(componentReact.getInitialProps) {
                 componentPropsPromises.push(componentReact.getInitialProps().then((state) => {
@@ -73,13 +77,14 @@ async function componentResolver(inputTemplate) {
     });
 
     await Promise.all(propsPromises);
-
+    
     commonScripts.forEach((src) => {
         dom.window.document.body.appendChild(createScript(dom, src, null));
     });
     createInlineScriptDataObject(dom, scriptsDataObject, 'ReactData');
-    createInlineScriptDataObject(dom, outputScriptString);
-    
+    _.forEach(scriptsURLObject, (value, key) => {
+        dom.window.document.body.appendChild(createScript(dom, value, key, true));
+    });
     return dom.serialize();
 }
 
